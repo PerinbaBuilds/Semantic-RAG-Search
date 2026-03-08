@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  newsgroups-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: newsgroups-semantic-search:latest
+    container_name: newsgroups_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount embeddings directory so you can update the artefacts without rebuilding
+      - ./embeddings:/app/embeddings:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

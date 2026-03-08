@@ -1,0 +1,67 @@
+# =========================================================
+# Dockerfile — Newsgroups Semantic Search API
+# =========================================================
+# Multi-stage build:
+#   Stage 1 (builder): install Python deps into a venv
+#   Stage 2 (runtime): copy only the venv + app code
+#
+# This keeps the final image lean (~1.5 GB vs ~3 GB single-stage)
+# because build tools, pip cache, and compiler headers are left behind.
+
+# ---- Stage 1: builder ----
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# Install system deps needed to compile some Python packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+
+# ---- Stage 2: runtime ----
+FROM python:3.12-slim AS runtime
+
+# Non-root user for security
+RUN useradd --create-home appuser
+WORKDIR /app
+
+# Copy venv from builder
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy application code
+COPY part1_prepare.py   .
+COPY part2_clustering.py .
+COPY part3_cache.py     .
+COPY part4_api.py       .
+
+# Copy pre-built artefacts (embeddings, ChromaDB, FCM model)
+# These should be generated locally with:
+#   python part1_prepare.py
+#   python part2_clustering.py
+# before building the Docker image.
+COPY embeddings/        embeddings/
+
+# Expose uvicorn port
+EXPOSE 8000
+
+# Switch to non-root user
+USER appuser
+
+# Health-check: poll /health every 30s
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+
+# Start the API
+CMD ["uvicorn", "part4_api:app", "--host", "0.0.0.0", "--port", "8000"]
