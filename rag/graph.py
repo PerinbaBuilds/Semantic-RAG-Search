@@ -2,25 +2,32 @@
 from __future__ import annotations
 import logging
 from typing import Literal
-import anthropic
+from groq import Groq
 from langchain_core.documents import Document
 from langgraph.graph import END, START, StateGraph
-from rag.config import ANTHROPIC_API_KEY, GRADED_K, LLM_MAX_TOKENS, LLM_MODEL, MAX_REWRITE_ATTEMPTS, RELEVANCE_THRESHOLD, RETRIEVAL_K
+from rag.config import GROQ_API_KEY, GRADED_K, LLM_MAX_TOKENS, LLM_MODEL, MAX_REWRITE_ATTEMPTS, RELEVANCE_THRESHOLD, RETRIEVAL_K
 from rag.prompts import GRADE_DOCUMENT_HUMAN, GRADE_DOCUMENT_SYSTEM, NO_DOCS_FALLBACK, QUERY_REWRITE_HUMAN, QUERY_REWRITE_SYSTEM, RAG_GENERATION_HUMAN, RAG_GENERATION_SYSTEM
 from rag.retriever import retrieve_with_scores
 from rag.state import RAGState
 
 logger = logging.getLogger(__name__)
 
-def _get_client(): return anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+def _get_client(): return Groq(api_key=GROQ_API_KEY)
+
+def _chat(client: Groq, system: str, user: str, max_tokens: int = 256) -> str:
+    r = client.chat.completions.create(
+        model=LLM_MODEL,
+        max_tokens=max_tokens,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+    )
+    return r.choices[0].message.content or ""
 
 def analyze_query(state: RAGState) -> dict:
     query, attempts = state["query"], state.get("rewrite_attempts", 0)
     if attempts == 0:
         return {"rewritten_query": query, "rewrite_attempts": 1}
-    r = _get_client().messages.create(model=LLM_MODEL, max_tokens=128, system=QUERY_REWRITE_SYSTEM,
-        messages=[{"role": "user", "content": QUERY_REWRITE_HUMAN.format(query=query)}])
-    return {"rewritten_query": r.content[0].text.strip(), "rewrite_attempts": attempts + 1}
+    text = _chat(_get_client(), QUERY_REWRITE_SYSTEM, QUERY_REWRITE_HUMAN.format(query=query), max_tokens=128)
+    return {"rewritten_query": text.strip(), "rewrite_attempts": attempts + 1}
 
 def retrieve(state: RAGState) -> dict:
     query = state.get("rewritten_query") or state["query"]
@@ -36,12 +43,12 @@ def grade_documents(state: RAGState) -> dict:
     relevant: list[Document] = []
     for doc in candidates[:GRADED_K * 2]:
         try:
-            resp = client.messages.create(model=LLM_MODEL, max_tokens=4, system=GRADE_DOCUMENT_SYSTEM,
-                messages=[{"role": "user", "content": GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600])}])
-            if resp.content[0].text.strip().upper().startswith("YES"):
+            text = _chat(client, GRADE_DOCUMENT_SYSTEM,
+                GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600]), max_tokens=4)
+            if text.strip().upper().startswith("YES"):
                 relevant.append(doc)
                 if len(relevant) >= GRADED_K: break
-        except Exception as e:
+        except Exception:
             relevant.append(doc)
             if len(relevant) >= GRADED_K: break
     return {"filtered_documents": relevant, "has_relevant_docs": len(relevant) > 0}
@@ -55,10 +62,17 @@ def generate(state: RAGState) -> dict:
         m = doc.metadata
         parts.append(f"[{i}] Category: {m.get('category','unknown')} | Score: {m.get('retrieval_score',0):.3f}\n{doc.page_content.strip()}")
         sources.append({"index": i, "category": m.get("category","unknown"), "score": m.get("retrieval_score",0.0), "cluster": m.get("dominant_cluster",-1), "snippet": doc.page_content[:200]})
-    r = _get_client().messages.create(model=LLM_MODEL, max_tokens=LLM_MAX_TOKENS, thinking={"type": "adaptive"},
-        system=RAG_GENERATION_SYSTEM, messages=[{"role": "user", "content": RAG_GENERATION_HUMAN.format(query=query, context="\n\n---\n\n".join(parts))}])
-    answer = next((b.text for b in r.content if b.type == "text"), "No answer generated.")
-    return {"answer": answer, "sources": sources, "input_tokens": r.usage.input_tokens, "output_tokens": r.usage.output_tokens}
+    client = _get_client()
+    r = client.chat.completions.create(
+        model=LLM_MODEL,
+        max_tokens=LLM_MAX_TOKENS,
+        messages=[
+            {"role": "system", "content": RAG_GENERATION_SYSTEM},
+            {"role": "user", "content": RAG_GENERATION_HUMAN.format(query=query, context="\n\n---\n\n".join(parts))},
+        ],
+    )
+    answer = r.choices[0].message.content or "No answer generated."
+    return {"answer": answer, "sources": sources, "input_tokens": r.usage.prompt_tokens, "output_tokens": r.usage.completion_tokens}
 
 def route_after_grading(state: RAGState) -> Literal["generate", "analyze_query"]:
     if state.get("has_relevant_docs"): return "generate"
