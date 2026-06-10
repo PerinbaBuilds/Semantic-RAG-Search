@@ -37,6 +37,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from part3_cache import SemanticCache
+from rag.graph import build_rag_graph
 
 logging.basicConfig(
     level=logging.INFO,
@@ -59,6 +60,7 @@ class AppState:
     embedding_model: Any = None
     chroma_collection: Any = None
     cache: Optional[SemanticCache] = None
+    rag_graph: Any = None
 
 
 state = AppState()
@@ -108,10 +110,15 @@ async def lifespan(app: FastAPI):
         similarity_threshold=SIMILARITY_THRESHOLD,
         embeddings_dir=EMBEDDINGS_DIR,
     )
-    logger.info(
-        f"SemanticCache ready (θ={SIMILARITY_THRESHOLD}). "
-        f"Total startup time: {time.perf_counter()-t0:.2f}s"
-    )
+    logger.info(f"SemanticCache ready (θ={SIMILARITY_THRESHOLD})")
+
+    logger.info("Compiling RAG graph (LangGraph + Claude)...")
+    try:
+      state.rag_graph = build_rag_graph()
+      logger.info(f"RAG graph ready. Total startup time: {time.perf_counter()-t0:.2f}s")
+    except Exception as e:
+      logger.error(f"RAG graph init failed ({e}). /rag/query will be unavailable.")
+      state.rag_graph = None
 
     yield   # App runs here
 
@@ -307,11 +314,63 @@ async def flush_cache() -> dict:
 # Health check
 # ---------------------------------------------------------------------------
 
+# REPLACE WITH:
 @app.get("/health")
 async def health() -> dict:
     return {
-        "status":    "ok",
+        "status":        "ok",
         "corpus_loaded": state.chroma_collection is not None,
-        "fcm_loaded": state.cache._fcm is not None if state.cache else False,
+        "fcm_loaded":    state.cache._fcm is not None if state.cache else False,
         "cache_entries": len(state.cache) if state.cache else 0,
+        "rag_ready":     state.rag_graph is not None,
     }
+
+
+class RAGQueryRequest(BaseModel):
+    query: str
+    model_config = {"json_schema_extra": {"example": {"query": "What did people think about the space shuttle?"}}}
+
+
+class RAGSource(BaseModel):
+    index: int
+    category: str
+    score: float
+    cluster: int
+    snippet: str
+
+
+class RAGQueryResponse(BaseModel):
+    query: str
+    rewritten_query: Optional[str]
+    answer: str
+    sources: list[RAGSource]
+    input_tokens: int
+    output_tokens: int
+    rewrite_attempts: int
+
+
+@app.post("/rag/query", response_model=RAGQueryResponse)
+async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
+    if not request.query.strip():
+        raise HTTPException(status_code=422, detail="Query must not be empty.")
+    if state.rag_graph is None:
+        raise HTTPException(status_code=503, detail="RAG graph unavailable. Check ANTHROPIC_API_KEY.")
+    query = request.query.strip()
+    try:
+        result = await state.rag_graph.ainvoke({
+            "query": query, "rewritten_query": None, "rewrite_attempts": 0,
+            "documents": [], "filtered_documents": [], "answer": "",
+            "sources": [], "input_tokens": 0, "output_tokens": 0, "has_relevant_docs": False,
+        })
+    except Exception as e:
+        logger.error(f"RAG pipeline error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"RAG pipeline error: {e}")
+    return RAGQueryResponse(
+        query=query,
+        rewritten_query=result.get("rewritten_query"),
+        answer=result.get("answer", ""),
+        sources=[RAGSource(**s) for s in (result.get("sources") or [])],
+        input_tokens=result.get("input_tokens", 0),
+        output_tokens=result.get("output_tokens", 0),
+        rewrite_attempts=result.get("rewrite_attempts", 0),
+    )
