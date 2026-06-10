@@ -13,6 +13,8 @@ from typing import Any, Optional
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from part3_cache import SemanticCache
@@ -59,6 +61,10 @@ async def lifespan(app: FastAPI):
     logger.info("=== Shutting down ===")
 
 app = FastAPI(title="Newsgroups Semantic Search", version="1.0.0", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def index(): return FileResponse("static/index.html")
 
 class QueryRequest(BaseModel):
     query: str

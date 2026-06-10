@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newsgroups Search</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 48px 16px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #f8fafc;
+    }
+
+    header p {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: #64748b;
+    }
+
+    .search-box {
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .search-box input {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid #1e293b;
+      background: #1a1f2e;
+      color: #f1f5f9;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: #6366f1;
+    }
+
+    .search-box input::placeholder { color: #475569; }
+
+    .search-box button {
+      padding: 14px 24px;
+      border-radius: 12px;
+      border: none;
+      background: #6366f1;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .search-box button:hover { background: #4f52d9; }
+    .search-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .result-area {
+      width: 100%;
+      max-width: 680px;
+      margin-top: 32px;
+    }
+
+    .spinner {
+      display: none;
+      text-align: center;
+      color: #475569;
+      font-size: 0.9rem;
+      margin-top: 24px;
+    }
+
+    .spinner.active { display: block; }
+
+    .answer-card {
+      background: #1a1f2e;
+      border: 1px solid #1e293b;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .answer-card .label {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #6366f1;
+      margin-bottom: 10px;
+    }
+
+    .answer-card .answer-text {
+      font-size: 0.97rem;
+      line-height: 1.7;
+      color: #cbd5e1;
+    }
+
+    .meta-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .badge {
+      font-size: 0.72rem;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      color: #64748b;
+    }
+
+    .sources-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 12px;
+    }
+
+    .source-item {
+      background: #1a1f2e;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+
+    .source-item:hover { border-color: #334155; }
+
+    .source-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .source-category {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6366f1;
+    }
+
+    .source-score {
+      font-size: 0.72rem;
+      color: #475569;
+    }
+
+    .source-snippet {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+
+    .error-msg {
+      background: #1e1010;
+      border: 1px solid #7f1d1d;
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #fca5a5;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Newsgroups Search</h1>
+    <p>Ask anything from 1993 Usenet — powered by RAG + Groq</p>
+  </header>
+
+  <div class="search-box">
+    <input id="queryInput" type="text" placeholder="e.g. What did people think about the space shuttle?" autofocus />
+    <button id="searchBtn" onclick="search()">Ask</button>
+  </div>
+
+  <div class="result-area">
+    <div class="spinner" id="spinner">Thinking…</div>
+    <div id="results"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('queryInput');
+    const btn = document.getElementById('searchBtn');
+    const spinner = document.getElementById('spinner');
+    const results = document.getElementById('results');
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+
+    async function search() {
+      const query = input.value.trim();
+      if (!query) return;
+
+      btn.disabled = true;
+      spinner.classList.add('active');
+      results.innerHTML = '';
+
+      try {
+        const res = await fetch('/rag/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Server error');
+        render(data);
+      } catch (err) {
+        results.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        spinner.classList.remove('active');
+      }
+    }
+
+    function render(data) {
+      const tokens = data.input_tokens + data.output_tokens;
+      const rewritten = data.rewritten_query && data.rewritten_query !== data.query
+        ? `<span class="badge">Rewritten: "${data.rewritten_query}"</span>` : '';
+
+      const sourcesHtml = (data.sources || []).map(s => `
+        <div class="source-item">
+          <div class="source-header">
+            <span class="source-category">${s.category}</span>
+            <span class="source-score">score ${s.score.toFixed(3)} · cluster ${s.cluster}</span>
+          </div>
+          <div class="source-snippet">${s.snippet}</div>
+        </div>
+      `).join('');
+
+      results.innerHTML = `
+        <div class="answer-card">
+          <div class="label">Answer</div>
+          <div class="answer-text">${data.answer}</div>
+          <div class="meta-row">
+            <span class="badge">${data.sources.length} sources</span>
+            <span class="badge">${tokens} tokens</span>
+            <span class="badge">${data.rewrite_attempts} rewrite attempt${data.rewrite_attempts !== 1 ? 's' : ''}</span>
+            ${rewritten}
+          </div>
+        </div>
+        ${data.sources.length > 0 ? `<div class="sources-title">Sources</div>${sourcesHtml}` : ''}
+      `;
+    }
+  </script>
+</body>
+</html>
