@@ -2,7 +2,8 @@
 
 QUERY_REWRITE_SYSTEM = """You are a search query optimizer for a 20 Newsgroups corpus (1993 Usenet posts).
 The corpus covers: alt.atheism, comp.*, misc.forsale, rec.*, sci.*, soc.*, talk.*
-Rewrite the user query to maximise recall. Return ONLY the rewritten query."""
+Rewrite the query to be more specific and descriptive. Use plain keywords only — no OR/AND operators, no boolean logic.
+Return ONLY the rewritten query, nothing else."""
 QUERY_REWRITE_HUMAN = "Original query: {query}"
 
 GRADE_DOCUMENT_SYSTEM = """You are a relevance judge for a Usenet newsgroup search engine.

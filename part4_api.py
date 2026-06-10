@@ -1,6 +1,9 @@
-﻿"""
+"""
 Part 4: FastAPI Service
 """
+
+from dotenv import load_dotenv
+load_dotenv()
 
 import logging
 import time
@@ -112,7 +115,7 @@ async def health() -> dict:
 @app.post("/rag/query", response_model=RAGQueryResponse)
 async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
     if not request.query.strip(): raise HTTPException(422, "Query must not be empty.")
-    if state.rag_graph is None: raise HTTPException(503, "RAG graph unavailable. Check ANTHROPIC_API_KEY.")
+    if state.rag_graph is None: raise HTTPException(503, "RAG graph unavailable. Check GROQ_API_KEY.")
     query = request.query.strip()
     try:
         result = await state.rag_graph.ainvoke({"query": query, "rewritten_query": None, "rewrite_attempts": 0, "documents": [], "filtered_documents": [], "answer": "", "sources": [], "input_tokens": 0, "output_tokens": 0, "has_relevant_docs": False})
