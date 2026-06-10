@@ -45,7 +45,7 @@ COPY part1_prepare.py   .
 COPY part2_clustering.py .
 COPY part3_cache.py     .
 COPY part4_api.py       .
-
+COPY rag/               rag/
 # Copy pre-built artefacts (embeddings, ChromaDB, FCM model)
 # These should be generated locally with:
 #   python part1_prepare.py
