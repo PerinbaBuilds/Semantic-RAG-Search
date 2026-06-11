@@ -1,32 +1,38 @@
-"""LangChain retriever wrapping the existing ChromaDB vector store."""
+"""Retriever using direct chromadb + sentence-transformers (no langchain-chroma)."""
 from __future__ import annotations
 import logging
 from functools import lru_cache
-from langchain_chroma import Chroma
-from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_huggingface import HuggingFaceEmbeddings
+import chromadb
+from sentence_transformers import SentenceTransformer
+from langchain_core.documents import Document
 from rag.config import CHROMA_DIR, COLLECTION_NAME, EMBEDDING_MODEL, RETRIEVAL_K
 
 logger = logging.getLogger(__name__)
 
 @lru_cache(maxsize=1)
-def get_embedding_function() -> HuggingFaceEmbeddings:
-    return HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True},
-    )
+def _get_model() -> SentenceTransformer:
+    return SentenceTransformer(EMBEDDING_MODEL)
 
 @lru_cache(maxsize=1)
-def get_vectorstore() -> Chroma:
-    return Chroma(
-        persist_directory=str(CHROMA_DIR),
-        collection_name=COLLECTION_NAME,
-        embedding_function=get_embedding_function(),
+def _get_collection():
+    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    return client.get_collection(COLLECTION_NAME)
+
+def retrieve_with_scores(query: str, k: int = RETRIEVAL_K) -> list[tuple[Document, float]]:
+    model = _get_model()
+    emb = model.encode([query], normalize_embeddings=True)[0].tolist()
+    col = _get_collection()
+    results = col.query(
+        query_embeddings=[emb],
+        n_results=k,
+        include=["documents", "metadatas", "distances"],
     )
-
-def get_retriever(k: int = RETRIEVAL_K) -> VectorStoreRetriever:
-    return get_vectorstore().as_retriever(search_type="similarity", search_kwargs={"k": k})
-
-def retrieve_with_scores(query: str, k: int = RETRIEVAL_K) -> list[tuple]:
-    return get_vectorstore().similarity_search_with_relevance_scores(query, k=k)
+    docs_and_scores: list[tuple[Document, float]] = []
+    for text, meta, dist in zip(
+        results["documents"][0],
+        results["metadatas"][0],
+        results["distances"][0],
+    ):
+        score = round(1.0 - dist / 2.0, 4)
+        docs_and_scores.append((Document(page_content=text, metadata=meta or {}), score))
+    return docs_and_scores
