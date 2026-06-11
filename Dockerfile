@@ -42,4 +42,4 @@ USER appuser
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')"
 
-CMD ["uvicorn", "part4_api:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["/opt/venv/bin/uvicorn", "part4_api:app", "--host", "0.0.0.0", "--port", "7860"]
