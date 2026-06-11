@@ -41,16 +41,27 @@ state = AppState()
 async def lifespan(app: FastAPI):
     logger.info("=== Starting up ===")
     t0 = time.perf_counter()
-    from sentence_transformers import SentenceTransformer
-    state.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+    try:
+        from sentence_transformers import SentenceTransformer
+        state.embedding_model = SentenceTransformer(EMBEDDING_MODEL)
+        logger.info("Embedding model loaded")
+    except Exception as e:
+        logger.error(f"Embedding model error: {e}")
+        state.embedding_model = None
     try:
         import chromadb
         client = chromadb.PersistentClient(path=str(CHROMA_DIR))
         state.chroma_collection = client.get_collection(COLLECTION_NAME)
+        logger.info(f"ChromaDB loaded: {state.chroma_collection.count()} docs")
     except Exception as e:
         logger.error(f"ChromaDB error: {e}")
         state.chroma_collection = None
-    state.cache = SemanticCache(similarity_threshold=SIMILARITY_THRESHOLD, embeddings_dir=EMBEDDINGS_DIR)
+    try:
+        state.cache = SemanticCache(similarity_threshold=SIMILARITY_THRESHOLD, embeddings_dir=EMBEDDINGS_DIR)
+        logger.info("Cache loaded")
+    except Exception as e:
+        logger.error(f"Cache error: {e}")
+        state.cache = None
     try:
         state.rag_graph = build_rag_graph()
         logger.info(f"Ready in {time.perf_counter()-t0:.2f}s")
@@ -98,12 +109,18 @@ def search_corpus(query_emb: np.ndarray, n_results: int = 5) -> list[dict]:
 @app.post("/query", response_model=QueryResponse)
 async def query(request: QueryRequest) -> QueryResponse:
     if not request.query.strip(): raise HTTPException(422, "Query must not be empty.")
+    if state.embedding_model is None: raise HTTPException(503, "Embedding model unavailable.")
     qt = request.query.strip(); qe = embed_query(qt)
-    ce = state.cache.lookup(qt, qe)
-    if ce: return QueryResponse(query=qt, cache_hit=True, matched_query=ce.query, similarity_score=round(float(np.dot(qe,ce.embedding)),4), result=ce.result, dominant_cluster=ce.dominant_cluster)
+    if state.cache is not None:
+        ce = state.cache.lookup(qt, qe)
+        if ce: return QueryResponse(query=qt, cache_hit=True, matched_query=ce.query, similarity_score=round(float(np.dot(qe,ce.embedding)),4), result=ce.result, dominant_cluster=ce.dominant_cluster)
     docs = search_corpus(qe); result = {"top_documents": docs, "query_time_ms": None}
-    entry = state.cache.store(qt, qe, result)
-    return QueryResponse(query=qt, cache_hit=False, matched_query=None, similarity_score=None, result=result, dominant_cluster=entry.dominant_cluster)
+    if state.cache is not None:
+        entry = state.cache.store(qt, qe, result)
+        dominant_cluster = entry.dominant_cluster
+    else:
+        dominant_cluster = -1
+    return QueryResponse(query=qt, cache_hit=False, matched_query=None, similarity_score=None, result=result, dominant_cluster=dominant_cluster)
 
 @app.get("/cache/stats", response_model=CacheStatsResponse)
 async def cache_stats() -> CacheStatsResponse:
