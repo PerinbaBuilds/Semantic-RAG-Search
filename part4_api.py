@@ -24,7 +24,13 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger(__name__)
 
 EMBEDDINGS_DIR  = Path("embeddings")
-CHROMA_DIR      = Path("embeddings/chroma_db")
+_CHROMA_SRC     = Path("embeddings/chroma_db")
+# HF Spaces has a read-only filesystem; copy ChromaDB to /tmp at startup
+import os, shutil
+_CHROMA_TMP = Path("/tmp/chroma_db")
+if _CHROMA_SRC.exists() and not _CHROMA_TMP.exists():
+    shutil.copytree(str(_CHROMA_SRC), str(_CHROMA_TMP))
+CHROMA_DIR = _CHROMA_TMP if _CHROMA_TMP.exists() else _CHROMA_SRC
 COLLECTION_NAME = "newsgroups"
 EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 SIMILARITY_THRESHOLD = 0.85
