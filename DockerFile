@@ -46,6 +46,7 @@ COPY part2_clustering.py .
 COPY part3_cache.py     .
 COPY part4_api.py       .
 COPY rag/               rag/
+COPY static/            static/
 
 # Copy pre-built artefacts (embeddings, ChromaDB, FCM model)
 # These should be generated locally with:
@@ -54,15 +55,15 @@ COPY rag/               rag/
 # before building the Docker image.
 COPY embeddings/        embeddings/
 
-# Expose uvicorn port
-EXPOSE 8000
+# Expose uvicorn port (HF Spaces requires 7860)
+EXPOSE 7860
 
 # Switch to non-root user
 USER appuser
 
 # Health-check: poll /health every 30s
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:7860/health')"
 
 # Start the API
-CMD ["uvicorn", "part4_api:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "part4_api:app", "--host", "0.0.0.0", "--port", "7860"]
