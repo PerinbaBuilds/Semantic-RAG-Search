@@ -4,7 +4,9 @@ from pathlib import Path
 
 BASE_DIR         = Path(__file__).resolve().parent.parent
 EMBEDDINGS_DIR   = BASE_DIR / "embeddings"
-CHROMA_DIR       = EMBEDDINGS_DIR / "chroma_db"
+_CHROMA_SRC      = EMBEDDINGS_DIR / "chroma_db"
+_CHROMA_TMP      = Path("/tmp/chroma_db")
+CHROMA_DIR       = _CHROMA_TMP if _CHROMA_TMP.exists() else _CHROMA_SRC
 COLLECTION_NAME  = "newsgroups"
 EMBEDDING_MODEL  = "all-MiniLM-L6-v2"
 RETRIEVAL_K          = 8
