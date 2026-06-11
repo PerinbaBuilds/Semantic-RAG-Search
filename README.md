@@ -1,5 +1,7 @@
 # Semantic RAG Search
+Ask a question in plain English — get a smart, cited answer pulled from 18,000+ real online discussions.
 
+Built as a full RAG (Retrieval-Augmented Generation) system: it finds the most relevant posts, filters out noise, and generates a grounded answer using an LLM — all in one pipeline.
 A semantic search engine that lets you ask natural language questions about **1993 Usenet newsgroup discussions** and get intelligent, cited answers.
 
 **Live Demo:** [perinbabuilds-newsgroups-search.hf.space](https://perinbabuilds-newsgroups-search.hf.space)
