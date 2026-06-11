@@ -151,3 +151,52 @@ async def rag_query(request: RAGQueryRequest) -> RAGQueryResponse:
     except Exception as e:
         raise HTTPException(500, f"RAG pipeline error: {e}")
     return RAGQueryResponse(query=query, rewritten_query=result.get("rewritten_query"), answer=result.get("answer",""), sources=[RAGSource(**s) for s in (result.get("sources") or [])], input_tokens=result.get("input_tokens",0), output_tokens=result.get("output_tokens",0), rewrite_attempts=result.get("rewrite_attempts",0))
+
+class RAGEvaluateRequest(BaseModel):
+    queries: list[str]
+    model_config = {"json_schema_extra": {"example": {"queries": ["What did people think about the space shuttle?"]}}}
+
+class RAGEvaluateScore(BaseModel):
+    query: str; answer: str; faithfulness: Optional[float]; answer_relevancy: Optional[float]; context_precision: Optional[float]
+
+class RAGEvaluateResponse(BaseModel):
+    scores: list[RAGEvaluateScore]
+    aggregate: dict[str, float]
+
+@app.post("/rag/evaluate", response_model=RAGEvaluateResponse)
+async def rag_evaluate(request: RAGEvaluateRequest) -> RAGEvaluateResponse:
+    if not request.queries: raise HTTPException(422, "queries must not be empty.")
+    if len(request.queries) > 10: raise HTTPException(422, "Max 10 queries per request.")
+    if state.rag_graph is None: raise HTTPException(503, "RAG graph unavailable.")
+    try:
+        from datasets import Dataset
+        from langchain_groq import ChatGroq
+        from langchain_huggingface import HuggingFaceEmbeddings
+        from ragas import evaluate
+        from ragas.metrics import faithfulness, answer_relevancy, context_precision
+        from ragas.llms import LangchainLLMWrapper
+        from ragas.embeddings import LangchainEmbeddingsWrapper
+        from rag.config import GROQ_API_KEY, LLM_MODEL, EMBEDDING_MODEL
+
+        rows = []
+        for q in request.queries:
+            result = await state.rag_graph.ainvoke({"query": q.strip(), "rewritten_query": None, "rewrite_attempts": 0, "documents": [], "filtered_documents": [], "answer": "", "sources": [], "input_tokens": 0, "output_tokens": 0, "has_relevant_docs": False})
+            contexts = [s["snippet"] for s in (result.get("sources") or [])]
+            rows.append({"question": q, "answer": result.get("answer", ""), "contexts": contexts or ["no context"]})
+
+        dataset = Dataset.from_dict({"question": [r["question"] for r in rows], "answer": [r["answer"] for r in rows], "contexts": [r["contexts"] for r in rows]})
+        llm = LangchainLLMWrapper(ChatGroq(model=LLM_MODEL, api_key=GROQ_API_KEY))
+        emb = LangchainEmbeddingsWrapper(HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL, model_kwargs={"device": "cpu"}, encode_kwargs={"normalize_embeddings": True}))
+        metrics = [faithfulness, answer_relevancy, context_precision]
+        for m in metrics: m.llm = llm
+        answer_relevancy.embeddings = emb
+
+        eval_result = evaluate(dataset, metrics=metrics)
+        df = eval_result.to_pandas()
+        metric_cols = [c for c in ["faithfulness", "answer_relevancy", "context_precision"] if c in df.columns]
+
+        scores = [RAGEvaluateScore(query=row["question"], answer=row["answer"], faithfulness=row.get("faithfulness"), answer_relevancy=row.get("answer_relevancy"), context_precision=row.get("context_precision")) for _, row in df.iterrows()]
+        aggregate = {col: float(df[col].mean()) for col in metric_cols}
+        return RAGEvaluateResponse(scores=scores, aggregate=aggregate)
+    except Exception as e:
+        raise HTTPException(500, f"Evaluation error: {e}")
