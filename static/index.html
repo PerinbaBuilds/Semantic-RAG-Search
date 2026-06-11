@@ -109,6 +109,39 @@
       background: #1c0a0a; border: 1px solid #7f1d1d;
       border-radius: 14px; padding: 16px 20px; color: #fca5a5; font-size: 0.88rem;
     }
+
+    .eval-section { width: 100%; max-width: 700px; margin-top: 56px; border-top: 1px solid #1e293b; padding-top: 32px; }
+    .eval-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .eval-title { font-size: 0.75rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 1px; }
+    .eval-btn {
+      padding: 10px 20px; border-radius: 10px; border: 1px solid #334155;
+      background: transparent; color: #94a3b8; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .eval-btn:hover { border-color: #6366f1; color: #818cf8; }
+    .eval-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .eval-note { font-size: 0.78rem; color: #334155; margin-bottom: 20px; }
+
+    .metric-bar-row { margin-bottom: 14px; }
+    .metric-label { font-size: 0.73rem; color: #64748b; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .metric-track { height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .metric-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #6366f1, #818cf8); transition: width 0.6s ease; }
+
+    .eval-query-row {
+      background: #111827; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px;
+    }
+    .eval-query-text { font-size: 0.82rem; color: #94a3b8; margin-bottom: 10px; }
+    .eval-scores { display: flex; gap: 16px; flex-wrap: wrap; }
+    .eval-score-chip { font-size: 0.7rem; color: #475569; }
+    .eval-score-chip span { color: #818cf8; font-weight: 700; }
+
+    .eval-aggregate {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+      padding: 18px 20px; margin-bottom: 20px;
+    }
+    .eval-aggregate-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #6366f1; margin-bottom: 14px; }
   </style>
 </head>
 <body>
@@ -138,11 +171,29 @@
     <div id="results"></div>
   </div>
 
+  <div class="eval-section">
+    <div class="eval-header">
+      <span class="eval-title">RAGAS Evaluation</span>
+      <button class="eval-btn" id="evalBtn" onclick="runEval()">Run Evaluation</button>
+    </div>
+    <p class="eval-note">Scores 8 default queries through the RAG pipeline using Faithfulness, Answer Relevancy, and Context Precision metrics. Takes ~2 minutes.</p>
+    <div class="spinner" id="evalSpinner">
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <span style="margin-left:6px">Evaluating&hellip; this takes a minute</span>
+    </div>
+    <div id="evalResults"></div>
+  </div>
+
   <script>
     const input = document.getElementById('queryInput');
     const btn = document.getElementById('searchBtn');
     const spinner = document.getElementById('spinner');
     const results = document.getElementById('results');
+    const evalBtn = document.getElementById('evalBtn');
+    const evalSpinner = document.getElementById('evalSpinner');
+    const evalResults = document.getElementById('evalResults');
 
     input.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
 
@@ -195,6 +246,72 @@
         </div>
         ${data.sources.length > 0 ? `<div class="sources-title">Sources</div>${sourcesHtml}` : ''}
       `;
+    }
+    async function runEval() {
+      evalBtn.disabled = true;
+      evalSpinner.classList.add('active');
+      evalResults.innerHTML = '';
+      const defaultQueries = [
+        "What did people think about the space shuttle program?",
+        "How did people discuss encryption and privacy in 1993?",
+        "What were common opinions about gun control?",
+        "What did people think about the Middle East conflict?",
+        "How did people discuss atheism and religion?",
+        "What were early discussions about computer graphics?",
+        "What did people say about baseball in 1993?",
+        "What were peoples views on the Clinton administration?"
+      ];
+      try {
+        const res = await fetch('/rag/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queries: defaultQueries })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Server error');
+        renderEval(data);
+      } catch (err) {
+        evalResults.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      } finally {
+        evalBtn.disabled = false;
+        evalSpinner.classList.remove('active');
+      }
+    }
+
+    function metricBar(label, value) {
+      if (value == null || isNaN(value)) return '';
+      const pct = Math.round(value * 100);
+      return `
+        <div class="metric-bar-row">
+          <div class="metric-label"><span>${label}</span><span>${pct}%</span></div>
+          <div class="metric-track"><div class="metric-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    }
+
+    function renderEval(data) {
+      const agg = data.aggregate || {};
+      const aggHtml = `
+        <div class="eval-aggregate">
+          <div class="eval-aggregate-title">Aggregate Averages</div>
+          ${metricBar('Faithfulness', agg.faithfulness)}
+          ${metricBar('Answer Relevancy', agg.answer_relevancy)}
+          ${metricBar('Context Precision', agg.llm_context_precision_without_reference)}
+        </div>`;
+
+      const rowsHtml = (data.scores || []).map(s => {
+        const scores = [
+          s.faithfulness != null ? `Faithfulness <span>${Math.round(s.faithfulness*100)}%</span>` : '',
+          s.answer_relevancy != null ? `Relevancy <span>${Math.round(s.answer_relevancy*100)}%</span>` : '',
+          s.context_precision != null ? `Context <span>${Math.round(s.context_precision*100)}%</span>` : '',
+        ].filter(Boolean).map(x => `<span class="eval-score-chip">${x}</span>`).join('');
+        return `
+          <div class="eval-query-row">
+            <div class="eval-query-text">${s.query}</div>
+            <div class="eval-scores">${scores}</div>
+          </div>`;
+      }).join('');
+
+      evalResults.innerHTML = aggHtml + `<div class="sources-title" style="margin-bottom:12px">Per-Query Scores</div>` + rowsHtml;
     }
   </script>
 </body>
