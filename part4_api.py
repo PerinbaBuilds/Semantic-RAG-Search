@@ -169,11 +169,10 @@ async def rag_evaluate(request: RAGEvaluateRequest) -> RAGEvaluateResponse:
     if len(request.queries) > 10: raise HTTPException(422, "Max 10 queries per request.")
     if state.rag_graph is None: raise HTTPException(503, "RAG graph unavailable.")
     try:
-        from datasets import Dataset
         from langchain_groq import ChatGroq
         from langchain_huggingface import HuggingFaceEmbeddings
-        from ragas import evaluate
-        from ragas.metrics import faithfulness, answer_relevancy, context_precision
+        from ragas import EvaluationDataset, SingleTurnSample, evaluate
+        from ragas.metrics import Faithfulness, AnswerRelevancy, LLMContextPrecisionWithoutReference
         from ragas.llms import LangchainLLMWrapper
         from ragas.embeddings import LangchainEmbeddingsWrapper
         from rag.config import GROQ_API_KEY, LLM_MODEL, EMBEDDING_MODEL
@@ -184,18 +183,16 @@ async def rag_evaluate(request: RAGEvaluateRequest) -> RAGEvaluateResponse:
             contexts = [s["snippet"] for s in (result.get("sources") or [])]
             rows.append({"question": q, "answer": result.get("answer", ""), "contexts": contexts or ["no context"]})
 
-        dataset = Dataset.from_dict({"question": [r["question"] for r in rows], "answer": [r["answer"] for r in rows], "contexts": [r["contexts"] for r in rows]})
         llm = LangchainLLMWrapper(ChatGroq(model=LLM_MODEL, api_key=GROQ_API_KEY))
         emb = LangchainEmbeddingsWrapper(HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL, model_kwargs={"device": "cpu"}, encode_kwargs={"normalize_embeddings": True}))
-        metrics = [faithfulness, answer_relevancy, context_precision]
-        for m in metrics: m.llm = llm
-        answer_relevancy.embeddings = emb
-
-        eval_result = evaluate(dataset, metrics=metrics)
+        samples = [SingleTurnSample(user_input=r["question"], response=r["answer"], retrieved_contexts=r["contexts"]) for r in rows]
+        dataset = EvaluationDataset(samples=samples)
+        metrics = [Faithfulness(llm=llm), AnswerRelevancy(llm=llm, embeddings=emb), LLMContextPrecisionWithoutReference(llm=llm)]
+        eval_result = evaluate(dataset=dataset, metrics=metrics)
         df = eval_result.to_pandas()
-        metric_cols = [c for c in ["faithfulness", "answer_relevancy", "context_precision"] if c in df.columns]
+        metric_cols = [c for c in ["faithfulness", "answer_relevancy", "llm_context_precision_without_reference"] if c in df.columns]
 
-        scores = [RAGEvaluateScore(query=row["question"], answer=row["answer"], faithfulness=row.get("faithfulness"), answer_relevancy=row.get("answer_relevancy"), context_precision=row.get("context_precision")) for _, row in df.iterrows()]
+        scores = [RAGEvaluateScore(query=rows[i]["question"], answer=rows[i]["answer"], faithfulness=df.iloc[i].get("faithfulness"), answer_relevancy=df.iloc[i].get("answer_relevancy"), context_precision=df.iloc[i].get("llm_context_precision_without_reference")) for i in range(len(rows))]
         aggregate = {col: float(df[col].mean()) for col in metric_cols}
         return RAGEvaluateResponse(scores=scores, aggregate=aggregate)
     except Exception as e:
