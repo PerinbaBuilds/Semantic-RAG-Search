@@ -11,6 +11,10 @@ Usage:
     python part5_evaluate.py --queries "question 1" "question 2"
 """
 
+import sys
+import unittest.mock
+sys.modules.setdefault("langchain_community.chat_models.vertexai", unittest.mock.MagicMock())
+
 from dotenv import load_dotenv
 load_dotenv()
 

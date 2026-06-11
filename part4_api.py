@@ -169,6 +169,8 @@ async def rag_evaluate(request: RAGEvaluateRequest) -> RAGEvaluateResponse:
     if len(request.queries) > 10: raise HTTPException(422, "Max 10 queries per request.")
     if state.rag_graph is None: raise HTTPException(503, "RAG graph unavailable.")
     try:
+        import sys, unittest.mock
+        sys.modules.setdefault("langchain_community.chat_models.vertexai", unittest.mock.MagicMock())
         from langchain_groq import ChatGroq
         from langchain_huggingface import HuggingFaceEmbeddings
         from ragas import EvaluationDataset, SingleTurnSample, evaluate
