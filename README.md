@@ -1,3 +1,12 @@
+---
+title: Newsgroups Search
+emoji: 🔍
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+---
+
 # Newsgroups Semantic Search
 
 A RAG-powered semantic search engine over the [20 Newsgroups](http://qwone.com/~jason/20Newsgroups/) corpus (18,000+ Usenet posts from 1993). Ask natural language questions and get answers grounded in the original posts.
