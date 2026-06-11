@@ -110,15 +110,22 @@ def print_report(result, rows: list[dict]) -> None:
         print(f"\n  Q: {q}")
         for col in metric_cols:
             val = float(row_data.get(col, float("nan")))
-            filled = int(val * 20)
-            bar = "█" * filled + "░" * (20 - filled)
             label = col.replace("llm_context_precision_without_reference", "context_precision")
-            print(f"     {label:22s}  {bar}  {val:.3f}")
+            if val != val:  # NaN
+                print(f"     {label:22s}  {'░' * 20}  n/a")
+            else:
+                filled = int(val * 20)
+                bar = "█" * filled + "░" * (20 - filled)
+                print(f"     {label:22s}  {bar}  {val:.3f}")
 
     print("\n" + "-" * 68)
     print("  Aggregate averages:")
     for col in metric_cols:
         mean = float(df[col].mean())
+        label = col.replace("llm_context_precision_without_reference", "context_precision")
+        if mean != mean:
+            print(f"     {label:22s}  {'░' * 20}  n/a")
+            continue
         filled = int(mean * 20)
         bar = "█" * filled + "░" * (20 - filled)
         label = col.replace("llm_context_precision_without_reference", "context_precision")
