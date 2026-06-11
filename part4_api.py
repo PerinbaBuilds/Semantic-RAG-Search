@@ -171,6 +171,8 @@ async def rag_evaluate(request: RAGEvaluateRequest) -> RAGEvaluateResponse:
     try:
         import sys, unittest.mock
         sys.modules.setdefault("langchain_community.chat_models.vertexai", unittest.mock.MagicMock())
+        sys.modules.setdefault("tensorflow", unittest.mock.MagicMock())
+        sys.modules.setdefault("tensorflow.python", unittest.mock.MagicMock())
         from langchain_groq import ChatGroq
         from langchain_huggingface import HuggingFaceEmbeddings
         from ragas import EvaluationDataset, SingleTurnSample, evaluate

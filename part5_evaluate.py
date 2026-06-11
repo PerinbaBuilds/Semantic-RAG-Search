@@ -14,6 +14,9 @@ Usage:
 import sys
 import unittest.mock
 sys.modules.setdefault("langchain_community.chat_models.vertexai", unittest.mock.MagicMock())
+sys.modules.setdefault("tensorflow", unittest.mock.MagicMock())
+sys.modules.setdefault("tensorflow.python", unittest.mock.MagicMock())
+sys.modules.setdefault("tensorflow.python.framework", unittest.mock.MagicMock())
 
 from dotenv import load_dotenv
 load_dotenv()
