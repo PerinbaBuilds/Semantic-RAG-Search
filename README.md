@@ -18,22 +18,12 @@ This project builds a full RAG (Retrieval-Augmented Generation) pipeline that:
 ---
 
 ## How It Works
-Your Question
-│
-▼
-Query Rewriter → LLM rewrites query for better search results
-│
-▼
-Semantic Retriever → Finds top 8 similar posts using vector embeddings
-│
-▼
-Document Grader → LLM filters out irrelevant results
-│
-▼
-Answer Generator → LLM writes an answer grounded in the retrieved posts
-│
-▼
-Answer + Sources
+
+1. **Query Rewriter** — LLM rewrites your query for better search results
+2. **Semantic Retriever** — Finds the top 8 similar posts using vector embeddings
+3. **Document Grader** — LLM filters out irrelevant results
+4. **Answer Generator** — LLM writes an answer grounded in the retrieved posts
+5. **Answer + Sources** returned to you
 
 Each step is a node in a **LangGraph** state machine, making the pipeline easy to extend or debug.
 ---
