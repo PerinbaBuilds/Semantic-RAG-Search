@@ -10,8 +10,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY part1_prepare.py   .
-COPY part2_clustering.py .
 COPY part3_cache.py     .
 COPY part4_api.py       .
 COPY rag/               rag/
