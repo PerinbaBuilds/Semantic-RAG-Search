@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Newsgroups Search</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%236366f1'/><circle cx='42' cy='42' r='20' fill='none' stroke='white' stroke-width='10'/><line x1='56' y1='56' x2='76' y2='76' stroke='white' stroke-width='10' stroke-linecap='round'/></svg>" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0a0d14;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 56px 16px 80px;
+    }
+
+    header { text-align: center; margin-bottom: 44px; }
+
+    .logo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 52px; height: 52px;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      border-radius: 14px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 24px rgba(99,102,241,0.35);
+    }
+    .logo svg { width: 28px; height: 28px; }
+
+    header h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.5px; color: #f8fafc; }
+    header p { margin-top: 8px; font-size: 0.88rem; color: #475569; }
+
+    .search-box { width: 100%; max-width: 700px; display: flex; gap: 10px; }
+
+    .search-box input {
+      flex: 1; padding: 15px 20px; border-radius: 14px;
+      border: 1px solid #1e293b; background: #111827; color: #f1f5f9;
+      font-size: 1rem; outline: none; transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .search-box input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.15); }
+    .search-box input::placeholder { color: #374151; }
+
+    .search-box button {
+      padding: 15px 26px; border-radius: 14px; border: none;
+      background: linear-gradient(135deg, #6366f1, #818cf8);
+      color: #fff; font-size: 1rem; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s; white-space: nowrap;
+      box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+    }
+    .search-box button:hover { opacity: 0.9; transform: translateY(-1px); }
+    .search-box button:active { transform: translateY(0); }
+    .search-box button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .result-area { width: 100%; max-width: 700px; margin-top: 32px; }
+
+    .spinner {
+      display: none; text-align: center; color: #475569; font-size: 0.88rem;
+      margin-top: 28px; gap: 8px; align-items: center; justify-content: center;
+    }
+    .spinner.active { display: flex; }
+    .spinner-dot {
+      width: 6px; height: 6px; background: #6366f1; border-radius: 50%;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .spinner-dot:nth-child(2) { animation-delay: 0.2s; }
+    .spinner-dot:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40%            { transform: scale(1);   opacity: 1; }
+    }
+
+    .answer-card {
+      background: #111827; border: 1px solid #1e293b;
+      border-radius: 18px; padding: 26px 28px; margin-bottom: 20px;
+    }
+    .answer-card .label {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: 1.2px;
+      text-transform: uppercase; color: #6366f1; margin-bottom: 12px;
+    }
+    .answer-card .answer-text { font-size: 0.96rem; line-height: 1.75; color: #cbd5e1; }
+
+    .meta-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
+    .badge {
+      font-size: 0.7rem; padding: 4px 10px; border-radius: 20px;
+      background: #0f172a; border: 1px solid #1e293b; color: #64748b;
+    }
+
+    .sources-title {
+      font-size: 0.75rem; font-weight: 700; color: #334155;
+      text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px;
+    }
+    .source-item {
+      background: #111827; border: 1px solid #1e293b;
+      border-radius: 14px; padding: 14px 18px; margin-bottom: 10px; transition: border-color 0.2s;
+    }
+    .source-item:hover { border-color: #334155; }
+    .source-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .source-category { font-size: 0.73rem; font-weight: 700; color: #818cf8; }
+    .source-score { font-size: 0.7rem; color: #334155; }
+    .source-snippet { font-size: 0.84rem; color: #94a3b8; line-height: 1.55; }
+
+    .error-msg {
+      background: #1c0a0a; border: 1px solid #7f1d1d;
+      border-radius: 14px; padding: 16px 20px; color: #fca5a5; font-size: 0.88rem;
+    }
+
+    .eval-section { width: 100%; max-width: 700px; margin-top: 56px; border-top: 1px solid #1e293b; padding-top: 32px; }
+    .eval-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .eval-title { font-size: 0.75rem; font-weight: 700; color: #334155; text-transform: uppercase; letter-spacing: 1px; }
+    .eval-btn {
+      padding: 10px 20px; border-radius: 10px; border: 1px solid #334155;
+      background: transparent; color: #94a3b8; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .eval-btn:hover { border-color: #6366f1; color: #818cf8; }
+    .eval-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .eval-note { font-size: 0.78rem; color: #334155; margin-bottom: 20px; }
+
+    .metric-bar-row { margin-bottom: 14px; }
+    .metric-label { font-size: 0.73rem; color: #64748b; margin-bottom: 5px; display: flex; justify-content: space-between; }
+    .metric-track { height: 6px; background: #1e293b; border-radius: 3px; overflow: hidden; }
+    .metric-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #6366f1, #818cf8); transition: width 0.6s ease; }
+
+    .eval-query-row {
+      background: #111827; border: 1px solid #1e293b; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px;
+    }
+    .eval-query-text { font-size: 0.82rem; color: #94a3b8; margin-bottom: 10px; }
+    .eval-scores { display: flex; gap: 16px; flex-wrap: wrap; }
+    .eval-score-chip { font-size: 0.7rem; color: #475569; }
+    .eval-score-chip span { color: #818cf8; font-weight: 700; }
+
+    .eval-aggregate {
+      background: #0f172a; border: 1px solid #1e293b; border-radius: 14px;
+      padding: 18px 20px; margin-bottom: 20px;
+    }
+    .eval-aggregate-title { font-size: 0.68rem; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: #6366f1; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/>
+        <line x1="16.5" y1="16.5" x2="22" y2="22"/>
+      </svg>
+    </div>
+    <h1>Newsgroups Search</h1>
+    <p>Ask anything from 1993 Usenet &mdash; powered by RAG + Groq</p>
+  </header>
+
+  <div class="search-box">
+    <input id="queryInput" type="text" placeholder="e.g. What did people think about the space shuttle?" autofocus />
+    <button id="searchBtn" onclick="search()">Ask</button>
+  </div>
+
+  <div class="result-area">
+    <div class="spinner" id="spinner">
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <span style="margin-left:6px">Thinking&hellip;</span>
+    </div>
+    <div id="results"></div>
+  </div>
+
+  <div class="eval-section">
+    <div class="eval-header">
+      <span class="eval-title">RAGAS Evaluation</span>
+      <button class="eval-btn" id="evalBtn" onclick="runEval()">Run Evaluation</button>
+    </div>
+    <p class="eval-note">Scores 8 default queries through the RAG pipeline using Faithfulness, Answer Relevancy, and Context Precision metrics. Takes ~2 minutes.</p>
+    <div class="spinner" id="evalSpinner">
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <div class="spinner-dot"></div>
+      <span style="margin-left:6px">Evaluating&hellip; this takes a minute</span>
+    </div>
+    <div id="evalResults"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById('queryInput');
+    const btn = document.getElementById('searchBtn');
+    const spinner = document.getElementById('spinner');
+    const results = document.getElementById('results');
+    const evalBtn = document.getElementById('evalBtn');
+    const evalSpinner = document.getElementById('evalSpinner');
+    const evalResults = document.getElementById('evalResults');
+
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+
+    async function search() {
+      const query = input.value.trim();
+      if (!query) return;
+      btn.disabled = true;
+      spinner.classList.add('active');
+      results.innerHTML = '';
+      try {
+        const res = await fetch('/rag/query', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Server error');
+        render(data);
+      } catch (err) {
+        results.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        spinner.classList.remove('active');
+      }
+    }
+
+    function render(data) {
+      const tokens = data.input_tokens + data.output_tokens;
+      const rewritten = data.rewritten_query && data.rewritten_query !== data.query
+        ? `<span class="badge">Rewritten: &ldquo;${data.rewritten_query}&rdquo;</span>` : '';
+      const sourcesHtml = (data.sources || []).map(s => `
+        <div class="source-item">
+          <div class="source-header">
+            <span class="source-category">${s.category}</span>
+            <span class="source-score">score ${s.score.toFixed(3)} &middot; cluster ${s.cluster}</span>
+          </div>
+          <div class="source-snippet">${s.snippet}</div>
+        </div>
+      `).join('');
+      results.innerHTML = `
+        <div class="answer-card">
+          <div class="label">Answer</div>
+          <div class="answer-text">${data.answer}</div>
+          <div class="meta-row">
+            <span class="badge">${data.sources.length} source${data.sources.length !== 1 ? 's' : ''}</span>
+            <span class="badge">${tokens} tokens</span>
+            <span class="badge">${data.rewrite_attempts} rewrite attempt${data.rewrite_attempts !== 1 ? 's' : ''}</span>
+            ${rewritten}
+          </div>
+        </div>
+        ${data.sources.length > 0 ? `<div class="sources-title">Sources</div>${sourcesHtml}` : ''}
+      `;
+    }
+    async function runEval() {
+      evalBtn.disabled = true;
+      evalSpinner.classList.add('active');
+      evalResults.innerHTML = '';
+      const defaultQueries = [
+        "What did people think about the space shuttle program?",
+        "How did people discuss encryption and privacy in 1993?",
+        "What were common opinions about gun control?",
+        "What did people think about the Middle East conflict?",
+        "How did people discuss atheism and religion?",
+        "What were early discussions about computer graphics?",
+        "What did people say about baseball in 1993?",
+        "What were peoples views on the Clinton administration?"
+      ];
+      try {
+        const res = await fetch('/rag/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ queries: defaultQueries })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Server error');
+        renderEval(data);
+      } catch (err) {
+        evalResults.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+      } finally {
+        evalBtn.disabled = false;
+        evalSpinner.classList.remove('active');
+      }
+    }
+
+    function metricBar(label, value) {
+      if (value == null || isNaN(value)) return '';
+      const pct = Math.round(value * 100);
+      return `
+        <div class="metric-bar-row">
+          <div class="metric-label"><span>${label}</span><span>${pct}%</span></div>
+          <div class="metric-track"><div class="metric-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    }
+
+    function renderEval(data) {
+      const agg = data.aggregate || {};
+      const aggHtml = `
+        <div class="eval-aggregate">
+          <div class="eval-aggregate-title">Aggregate Averages</div>
+          ${metricBar('Faithfulness', agg.faithfulness)}
+          ${metricBar('Answer Relevancy', agg.answer_relevancy)}
+          ${metricBar('Context Precision', agg.llm_context_precision_without_reference)}
+        </div>`;
+
+      const rowsHtml = (data.scores || []).map(s => {
+        const scores = [
+          s.faithfulness != null ? `Faithfulness <span>${Math.round(s.faithfulness*100)}%</span>` : '',
+          s.answer_relevancy != null ? `Relevancy <span>${Math.round(s.answer_relevancy*100)}%</span>` : '',
+          s.context_precision != null ? `Context <span>${Math.round(s.context_precision*100)}%</span>` : '',
+        ].filter(Boolean).map(x => `<span class="eval-score-chip">${x}</span>`).join('');
+        return `
+          <div class="eval-query-row">
+            <div class="eval-query-text">${s.query}</div>
+            <div class="eval-scores">${scores}</div>
+          </div>`;
+      }).join('');
+
+      evalResults.innerHTML = aggHtml + `<div class="sources-title" style="margin-bottom:12px">Per-Query Scores</div>` + rowsHtml;
+    }
+  </script>
+</body>
+</html>
