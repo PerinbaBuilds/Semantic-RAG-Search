@@ -1,12 +1,3 @@
----
-title: Newsgroups Search
-emoji: 🔍
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
----
-
 # Semantic RAG Search
 
 Ask a question in plain English — get a smart, cited answer pulled from 18,000+ real Usenet discussions from 1993.
