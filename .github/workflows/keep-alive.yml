@@ -1,0 +1,59 @@
+name: Keep HF Space Alive
+
+# Pings the Hugging Face Space on a schedule so the free-tier Space
+# never goes idle. An idle Space cold-starts slowly, which looks bad
+# to anyone (e.g. a recruiter) opening the live demo link.
+#
+# NOTE: GitHub only runs scheduled workflows from the repository's
+# DEFAULT branch. This file must be merged into `main` before the
+# cron will fire. `workflow_dispatch` lets you trigger it manually
+# from the Actions tab to test it on any branch.
+
+on:
+  schedule:
+    # Every 5 minutes (the minimum interval GitHub Actions allows).
+    # GitHub may delay/skip runs under heavy load — that's fine here,
+    # a hit every few minutes is enough to keep the Space warm.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+# A ping run should never block or cancel another; keep them serial.
+concurrency:
+  group: keep-alive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping the Space health endpoint
+        env:
+          # Override in repo Settings > Variables if the URL ever changes.
+          SPACE_URL: ${{ vars.SPACE_URL || 'https://perinbabuilds-newsgroups-search.hf.space' }}
+        run: |
+          set -euo pipefail
+          endpoint="${SPACE_URL%/}/health"
+          echo "Pinging: $endpoint"
+
+          # Retry a few times: a sleeping Space needs a moment to wake,
+          # so the first request can be slow or fail before it's ready.
+          attempts=5
+          for i in $(seq 1 "$attempts"); do
+            code=$(curl -sS -L -o /tmp/body.txt -w '%{http_code}' \
+                     --connect-timeout 20 --max-time 120 \
+                     "$endpoint" || echo "000")
+            echo "Attempt $i/$attempts -> HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Space is awake:"
+              cat /tmp/body.txt
+              exit 0
+            fi
+            # Wake-up backoff: 15s, 30s, 45s, 60s between tries.
+            sleep $((i * 15))
+          done
+
+          echo "::warning::Space did not return HTTP 200 after $attempts attempts (last: $code)."
+          # Don't fail the job — a transient wake-up delay shouldn't spam
+          # failure emails. The next scheduled run will try again.
+          exit 0
