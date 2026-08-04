@@ -137,7 +137,9 @@ async def cache_stats() -> CacheStatsResponse:
 async def flush_cache() -> dict:
     state.cache.flush(); return {"status": "ok", "message": "Cache flushed."}
 
-@app.get("/health")
+# Allow HEAD as well as GET: uptime monitors (e.g. UptimeRobot) probe with
+# HEAD by default, and a GET-only route answers HEAD with 405 Method Not Allowed.
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health() -> dict:
     return {"status": "ok", "corpus_loaded": state.chroma_collection is not None, "fcm_loaded": state.cache._fcm is not None if state.cache else False, "cache_entries": len(state.cache) if state.cache else 0, "rag_ready": state.rag_graph is not None}
 
