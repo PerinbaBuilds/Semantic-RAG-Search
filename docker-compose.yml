@@ -5,7 +5,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      target: runtime
     image: newsgroups-semantic-search:latest
     container_name: newsgroups_api
     ports:

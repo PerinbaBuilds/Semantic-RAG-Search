@@ -1,124 +1,77 @@
-# Semantic RAG Search
+# Semantic RAG Search &nbsp;[![CI](https://github.com/PerinbaBuilds/Semantic-RAG-Search/actions/workflows/ci.yml/badge.svg)](https://github.com/PerinbaBuilds/Semantic-RAG-Search/actions/workflows/ci.yml)
 
-Ask a question in plain English — get a smart, cited answer pulled from 18,000+ real Usenet discussions from 1993.
+Ask a question in plain English and get a smart, cited answer pulled from 18,000+ real Usenet discussions from 1993.
 
-Built as a full RAG (Retrieval-Augmented Generation) system: it finds the most relevant posts, filters out noise, and generates a grounded answer using an LLM — all in one pipeline.
-
-**Live Demo:** [perinbabuilds-newsgroups-search.hf.space](https://perinbabuilds-newsgroups-search.hf.space)
+**Live demo:** [perinbabuilds-newsgroups-search.hf.space](https://perinbabuilds-newsgroups-search.hf.space)
 
 ---
 
-## The Problem It Solves
+## Why this exists
 
-The 20 Newsgroups dataset contains 18,000+ text posts from 1993 covering topics like space exploration, politics, religion, sports, and technology. Traditional keyword search fails on this data — you need to understand meaning, not just match words.
+Traditional keyword search falls apart on messy, decades-old text — you can't match words when people phrase the same idea ten different ways. I wanted to build a full Retrieval-Augmented Generation (RAG) pipeline end to end, not just a demo: something that understands a question, finds the genuinely relevant posts, filters out the noise, and writes a grounded answer with sources. The 20 Newsgroups corpus was the perfect messy, real-world dataset to prove it on.
 
-This project builds a full RAG pipeline that:
-1. Understands what you’re asking
-2. Finds the most relevant posts from the corpus
-3. Generates a grounded answer with sources
+---
+
+## Features
+
+- **Natural-language answers with sources** — ask in plain English, get a grounded answer that cites the posts it came from.
+- **Self-correcting retrieval** — if the first search returns weak results, the pipeline rewrites the query and tries again.
+- **Relevance grading** — an LLM filters retrieved posts before answering, so noise never reaches the generation step.
+- **Semantic cache** — near-duplicate queries reuse past results instead of re-calling the LLM, accelerated by query clustering.
+- **Live quality evaluation** — score the pipeline with RAGAS (faithfulness, answer relevancy, context precision) from the UI or CLI — no ground-truth labels needed.
 
 ---
 
 ## How It Works
 
-1. **Query Rewriter** — LLM rewrites your query for better search results
-2. **Semantic Retriever** — Finds the top 8 similar posts using vector embeddings
-3. **Document Grader** — LLM filters out irrelevant results
-4. **Answer Generator** — LLM writes an answer grounded in the retrieved posts
-5. **Answer + Sources** returned to you
+The RAG pipeline runs as a **LangGraph** state machine — each step is a node, so it's easy to extend or debug:
 
-Each step is a node in a **LangGraph** state machine, making the pipeline easy to extend or debug.
+1. **Query Rewriter** — on a retry, the LLM rewrites your query for better recall.
+2. **Semantic Retriever** — embeds the query and pulls the top 8 similar posts from the vector store.
+3. **Document Grader** — the LLM keeps only the posts that are actually relevant.
+4. **Router** — no relevant posts? Loop back and rewrite (up to 2 attempts). Otherwise, generate.
+5. **Answer Generator** — the LLM writes an answer grounded strictly in the retrieved posts, and returns them as sources.
+
+For the full component breakdown, data flow, and design tradeoffs, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
 ## Tech Stack
 
-| What | How |
-|---|---|
-| Text embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
-| Vector database | ChromaDB (18,159 documents) |
-| LLM | Groq — `llama-3.3-70b-versatile` (free tier) |
-| Pipeline | LangGraph |
-| Semantic cache | Custom Fuzzy C-Means clustering |
-| Evaluation | RAGAS (no ground truth needed) |
-| API | FastAPI |
-| Hosting | Hugging Face Spaces (Docker) |
-
----
-
-## Key Features
-
-- **Query rewriting** — automatically improves vague queries before searching
-- **Document grading** — filters retrieved chunks for relevance before generating
-- **Semantic cache** — avoids redundant LLM calls for similar queries using FCM clustering
-- **RAGAS evaluation** — measures pipeline quality with faithfulness, answer relevancy, and context precision
-- **Live eval UI** — run evaluation and see metric bars directly in the browser
-
----
-
-## Project Structure
-
-```
-├── part3_cache.py          # Semantic cache — returns cached answers for similar past queries
-├── part4_api.py            # FastAPI app — all HTTP endpoints
-├── rag/
-│   ├── graph.py            # LangGraph RAG pipeline (query rewrite → retrieve → grade → generate)
-│   ├── retriever.py        # ChromaDB vector search
-│   ├── prompts.py          # All LLM prompt templates
-│   └── config.py           # Configuration (model, thresholds, paths)
-├── scripts/
-│   ├── part1_prepare.py    # Downloads dataset, generates embeddings, stores in ChromaDB
-│   ├── part2_clustering.py # Trains Fuzzy C-Means model for the semantic cache
-│   └── part5_evaluate.py   # Runs RAGAS evaluation from the command line
-├── static/
-│   └── index.html          # The web UI
-└── embeddings/             # ChromaDB + FCM model (built locally, not committed)
-```
-
----
-
-## API Endpoints
-
-| Endpoint | Method | What It Does |
+| Layer | Choice | Why |
 |---|---|---|
-| `/` | GET | Opens the web UI |
-| `/rag/query` | POST | Ask a question, get an AI answer with sources |
-| `/rag/evaluate` | POST | Score the pipeline with RAGAS metrics |
-| `/query` | POST | Pure semantic search, no LLM generation |
-| `/health` | GET | Check if all components are loaded |
-| `/cache/stats` | GET | See cache hit rate |
-
-**Example request:**
-
-```bash
-curl -X POST https://perinbabuilds-newsgroups-search.hf.space/rag/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What did people think about the space shuttle program?"}'
-```
+| API | FastAPI | Async, fast to iterate, serves the UI and JSON from one process |
+| Pipeline | LangGraph | Models the rewrite→retrieve→grade→generate retry loop as an inspectable state machine |
+| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Small, fast, runs on CPU — good enough semantic quality for short posts |
+| Vector DB | ChromaDB (18,159 docs) | Persistent local vector store, zero external service to run |
+| LLM | Groq — `llama-3.3-70b-versatile` | Fast enough to call several times per request, and free-tier friendly |
+| Semantic cache | Custom Fuzzy C-Means clustering | Cluster routing turns cache lookups from O(N) into ~O(N/K) |
+| Evaluation | RAGAS | Measures quality with no ground-truth labels — the dataset has none |
+| Hosting | Hugging Face Spaces (Docker) | Free Docker runtime for the live demo |
 
 ---
 
-## Evaluation Metrics (RAGAS)
+## Architecture
 
-No ground truth needed — these metrics evaluate quality automatically:
-
-| Metric | What It Checks |
-|---|---|
-| Faithfulness | Does the answer only say things supported by the retrieved posts? |
-| Answer Relevancy | Does the answer actually address the question asked? |
-| Context Precision | Were the right posts retrieved for the question? |
-
-Run it locally:
-
-```bash
-python scripts/part5_evaluate.py
+```
+Browser UI ──HTTP──► FastAPI ──┬──► Semantic Cache ──► FCM cluster routing
+                               │
+                               └──► LangGraph pipeline ──► Retriever ──► ChromaDB
+                                         │                                  ▲
+                                         └──► Groq LLM (rewrite/grade/gen)   │
+                                                                    SentenceTransformer
 ```
 
-Or click **Run Evaluation** in the UI.
+- **FastAPI** — HTTP surface, request validation, startup wiring (`part4_api.py`)
+- **LangGraph pipeline** — rewrite → retrieve → grade → generate (`rag/graph.py`)
+- **Retriever** — query embedding + ChromaDB vector search (`rag/retriever.py`)
+- **Semantic cache** — cluster-accelerated nearest-neighbour cache over past queries (`part3_cache.py`)
+
+**The one interesting decision:** the semantic cache doesn't scan every stored query. It uses the Fuzzy C-Means clusters to route a lookup to just the top-2 relevant cluster buckets — a roughly K-fold speedup, traded against the occasional false miss when a query sits on a cluster boundary. The full reasoning (including why the similarity threshold is 0.85) is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
-## Local Setup
+## Getting Started
 
 ```bash
 # 1. Clone and install
@@ -126,11 +79,11 @@ git clone https://github.com/PerinbaBuilds/Semantic-RAG-Search
 cd Semantic-RAG-Search
 pip install -r requirements.txt
 
-# 2. Add your Groq API key
+# 2. Configure your environment
 cp .env.example .env
-# Edit .env and set GROQ_API_KEY=your_key_here
+# Edit .env and set GROQ_API_KEY (free key: https://console.groq.com/keys)
 
-# 3. Build the vector database (one-time, ~10 min)
+# 3. Build the vector database + cluster model (one-time, ~10 min)
 python scripts/part1_prepare.py
 python scripts/part2_clustering.py
 
@@ -139,11 +92,65 @@ uvicorn part4_api:app --host 0.0.0.0 --port 7860
 # Visit http://localhost:7860
 ```
 
+**Requirements:** Python 3.12+, a free [Groq API key](https://console.groq.com/keys), and ~2 GB disk for the corpus + embeddings.
+
+### Run with Docker
+
+```bash
+cp .env.example .env   # set GROQ_API_KEY
+docker compose up --build
+# Visit http://localhost:7860
+```
+
+The build step (`part1`/`part2`) populates `embeddings/`, which the container mounts read-only.
+
+---
+
+## Usage
+
+Ask a question and get an answer with sources:
+
+```bash
+curl -X POST http://localhost:7860/rag/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What did people think about the space shuttle program?"}'
+```
+
+Or run pure semantic search (no LLM), score the pipeline, or check health:
+
+| Endpoint | Method | What it does |
+|---|---|---|
+| `/` | GET | Opens the web UI |
+| `/rag/query` | POST | Ask a question, get an AI answer with sources |
+| `/rag/evaluate` | POST | Score the pipeline with RAGAS metrics |
+| `/query` | POST | Pure semantic search, no LLM generation |
+| `/health` | GET | Check which components loaded |
+| `/cache/stats` | GET | See cache hit rate |
+
+Run the evaluation from the CLI (or click **Run Evaluation** in the UI):
+
+```bash
+python scripts/part5_evaluate.py
+```
+
+---
+
+## Known Limitations / What I'd Do Differently
+
+- **The semantic cache is in-memory** — it resets on restart. In production I'd back it with Redis or a persistent store so warm state survives deploys.
+- **No automated test suite yet.** CI currently byte-compiles and lints the code; the retry loop and cache routing deserve real unit tests.
+- **Per-document grading is a serial LLM call per post**, which adds latency. Batching the grading into a single prompt (or a cheaper cross-encoder re-ranker) would be faster and cheaper.
+- **Corpus is frozen at build time.** There's no incremental ingestion — adding documents means re-running the full prep pipeline.
+- **Grading falls open, not closed** — if the grader LLM errors, the document is kept rather than dropped. That protects recall but could let a weak post through on a bad API day.
+
 ---
 
 ## Dataset
 
-[20 Newsgroups](http://qwone.com/~jason/20Newsgroups/) — a widely used NLP benchmark dataset of Usenet posts from 1993.
-18,000+ posts across 20 categories including sci.space, talk.politics.guns, alt.atheism, rec.sport.baseball, sci.crypt, and more.
+[20 Newsgroups](http://qwone.com/~jason/20Newsgroups/) — a widely used NLP benchmark of ~18,000 Usenet posts from 1993 across 20 categories (sci.space, talk.politics.guns, alt.atheism, rec.sport.baseball, sci.crypt, and more). Downloaded automatically via scikit-learn; not stored in this repo.
 
-Downloaded automatically via scikit-learn — not stored in this repo.
+---
+
+## License
+
+MIT
