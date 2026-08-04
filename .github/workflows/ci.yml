@@ -1,0 +1,39 @@
+name: CI
+
+# Fast sanity checks that run on every push and pull request:
+#   - the code byte-compiles (no syntax errors)
+#   - Ruff finds no lint errors
+# Kept deliberately light so it stays green in seconds and never pulls the
+# heavy ML dependencies (torch, chromadb, ragas) needed at runtime.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & compile
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ruff
+        run: pip install ruff
+
+      - name: Byte-compile all sources
+        run: python -m compileall -q part3_cache.py part4_api.py rag scripts setup.py
+
+      - name: Lint with Ruff
+        run: ruff check .

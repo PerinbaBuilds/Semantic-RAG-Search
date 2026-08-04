@@ -1,0 +1,12 @@
+# Ruff configuration for CI.
+# We intentionally lint only for real errors — syntax errors, undefined names,
+# and broken f-strings — rather than style. The codebase favours a compact,
+# single-line style on purpose, so cosmetic rules are left off.
+line-length = 200
+
+[lint]
+# E9  — syntax / runtime errors
+# F63 — invalid comparisons / assertions
+# F7  — misplaced statements (e.g. break outside loop)
+# F82 — undefined names
+select = ["E9", "F63", "F7", "F82"]

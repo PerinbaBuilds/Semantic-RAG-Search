@@ -1,4 +1,4 @@
-"""RAG pipeline for Newsgroups Search using LangChain + LangGraph + Claude."""
+"""RAG pipeline for Newsgroups Search using LangChain + LangGraph + Groq."""
 from rag.graph import build_rag_graph, RAGGraph
 
 __all__ = ["build_rag_graph", "RAGGraph"]
