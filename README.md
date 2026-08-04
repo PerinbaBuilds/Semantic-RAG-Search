@@ -4,15 +4,14 @@ Ask a question in plain English and get a smart, cited answer pulled from 18,000
 
 **Live demo:** [perinbabuilds-newsgroups-search.hf.space](https://perinbabuilds-newsgroups-search.hf.space)
 
-![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
-![LangGraph](https://img.shields.io/badge/LangGraph-1C3C3C?style=flat-square&logo=langchain&logoColor=white)
-![ChromaDB](https://img.shields.io/badge/ChromaDB-FF6B6B?style=flat-square&logo=databricks&logoColor=white)
-![Groq](https://img.shields.io/badge/Groq_LLM-F55036?style=flat-square&logo=lightning&logoColor=white)
-![Sentence Transformers](https://img.shields.io/badge/Sentence_Transformers-FFD21E?style=flat-square&logo=huggingface&logoColor=black)
-![RAGAS](https://img.shields.io/badge/RAGAS-6E56CF?style=flat-square&logo=probot&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
-![Hugging Face](https://img.shields.io/badge/Hugging_Face_Spaces-FFD21E?style=flat-square&logo=huggingface&logoColor=black)
+![Python](https://img.shields.io/badge/PYTHON-0d1117?style=for-the-badge&logo=python&logoColor=3776AB)
+![FastAPI](https://img.shields.io/badge/FASTAPI-0d1117?style=for-the-badge&logo=fastapi&logoColor=009688)
+![LangChain](https://img.shields.io/badge/LANGCHAIN-0d1117?style=for-the-badge&logo=langchain&logoColor=FFFFFF)
+![Hugging Face](https://img.shields.io/badge/HUGGING_FACE-0d1117?style=for-the-badge&logo=huggingface&logoColor=FFD21E)
+![PyTorch](https://img.shields.io/badge/PYTORCH-0d1117?style=for-the-badge&logo=pytorch&logoColor=EE4C2C)
+![scikit-learn](https://img.shields.io/badge/SCIKIT--LEARN-0d1117?style=for-the-badge&logo=scikitlearn&logoColor=F7931E)
+![Docker](https://img.shields.io/badge/DOCKER-0d1117?style=for-the-badge&logo=docker&logoColor=2496ED)
+![GitHub Actions](https://img.shields.io/badge/GITHUB_ACTIONS-0d1117?style=for-the-badge&logo=githubactions&logoColor=2088FF)
 
 ---
 
