@@ -4,8 +4,8 @@ A deep dive into how **Semantic RAG Search** is put together — the components,
 data flow, and the design decisions (with their tradeoffs) that shaped it.
 
 This document complements the higher-level [`README.md`](../README.md), the
-[Software Requirements Specification](../Software_Requirements_Specification.md),
-and the [Software Design Document](../Software_Design_Document.md).
+[Software Requirements Specification](Software_Requirements_Specification.md),
+and the [Software Design Document](Software_Design_Document.md).
 
 ---
 
