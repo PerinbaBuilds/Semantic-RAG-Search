@@ -12,16 +12,6 @@ Traditional keyword search falls apart on messy, decades-old text — you can't 
 
 ---
 
-## Features
-
-- **Natural-language answers with sources** — ask in plain English, get a grounded answer that cites the posts it came from.
-- **Self-correcting retrieval** — if the first search returns weak results, the pipeline rewrites the query and tries again.
-- **Relevance grading** — an LLM filters retrieved posts before answering, so noise never reaches the generation step.
-- **Semantic cache** — near-duplicate queries reuse past results instead of re-calling the LLM, accelerated by query clustering.
-- **Live quality evaluation** — score the pipeline with RAGAS (faithfulness, answer relevancy, context precision) from the UI or CLI — no ground-truth labels needed.
-
----
-
 ## How It Works
 
 The RAG pipeline runs as a **LangGraph** state machine — each step is a node, so it's easy to extend or debug:
@@ -33,6 +23,16 @@ The RAG pipeline runs as a **LangGraph** state machine — each step is a node, 
 5. **Answer Generator** — the LLM writes an answer grounded strictly in the retrieved posts, and returns them as sources.
 
 For the full component breakdown, data flow, and design tradeoffs, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## Features
+
+- **Natural-language answers with sources** — ask in plain English, get a grounded answer that cites the posts it came from.
+- **Self-correcting retrieval** — if the first search returns weak results, the pipeline rewrites the query and tries again.
+- **Relevance grading** — an LLM filters retrieved posts before answering, so noise never reaches the generation step.
+- **Semantic cache** — near-duplicate queries reuse past results instead of re-calling the LLM, accelerated by query clustering.
+- **Live quality evaluation** — score the pipeline with RAGAS (faithfulness, answer relevancy, context precision) from the UI or CLI — no ground-truth labels needed.
 
 ---
 
