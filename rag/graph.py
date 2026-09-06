@@ -42,16 +42,18 @@ def grade_documents(state: RAGState) -> dict:
     candidates = [d for d in docs if d.metadata.get("retrieval_score", 0) >= RELEVANCE_THRESHOLD]
     relevant: list[Document] = []
     for doc in candidates[:GRADED_K * 2]:
+        keep = True
         try:
-            # max_tokens must leave room for reasoning models (e.g. gpt-oss) that
-            # spend output tokens thinking before returning the YES/NO verdict; a
-            # tiny budget yields empty content and rejects every document.
-            text = _chat(client, GRADE_DOCUMENT_SYSTEM,
-                GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600]), max_tokens=512)
-            if "YES" in text.strip().upper():
-                relevant.append(doc)
-                if len(relevant) >= GRADED_K: break
+            # Reasoning models (e.g. gpt-oss) spend output tokens thinking, so the
+            # YES/NO verdict can come back empty or verbose. Fail open: a candidate
+            # that already passed the similarity threshold is kept unless the model
+            # explicitly rejects it, so grading can never silently empty the context.
+            verdict = _chat(client, GRADE_DOCUMENT_SYSTEM,
+                GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600]), max_tokens=512).strip().upper()
+            keep = not (verdict.startswith("NO") or ("NO" in verdict and "YES" not in verdict))
         except Exception:
+            keep = True
+        if keep:
             relevant.append(doc)
             if len(relevant) >= GRADED_K: break
     return {"filtered_documents": relevant, "has_relevant_docs": len(relevant) > 0}
