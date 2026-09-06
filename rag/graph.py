@@ -26,7 +26,7 @@ def analyze_query(state: RAGState) -> dict:
     query, attempts = state["query"], state.get("rewrite_attempts", 0)
     if attempts == 0:
         return {"rewritten_query": query, "rewrite_attempts": 1}
-    text = _chat(_get_client(), QUERY_REWRITE_SYSTEM, QUERY_REWRITE_HUMAN.format(query=query), max_tokens=128)
+    text = _chat(_get_client(), QUERY_REWRITE_SYSTEM, QUERY_REWRITE_HUMAN.format(query=query), max_tokens=512)
     return {"rewritten_query": text.strip(), "rewrite_attempts": attempts + 1}
 
 def retrieve(state: RAGState) -> dict:
@@ -43,9 +43,12 @@ def grade_documents(state: RAGState) -> dict:
     relevant: list[Document] = []
     for doc in candidates[:GRADED_K * 2]:
         try:
+            # max_tokens must leave room for reasoning models (e.g. gpt-oss) that
+            # spend output tokens thinking before returning the YES/NO verdict; a
+            # tiny budget yields empty content and rejects every document.
             text = _chat(client, GRADE_DOCUMENT_SYSTEM,
-                GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600]), max_tokens=4)
-            if text.strip().upper().startswith("YES"):
+                GRADE_DOCUMENT_HUMAN.format(query=query, document=doc.page_content[:600]), max_tokens=512)
+            if "YES" in text.strip().upper():
                 relevant.append(doc)
                 if len(relevant) >= GRADED_K: break
         except Exception:
