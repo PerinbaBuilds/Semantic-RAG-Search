@@ -29,7 +29,7 @@ flowchart TD
 
     RETR --> CHROMA[("ChromaDB<br/>18,159 vectors")]
     RETR --> EMB["SentenceTransformer<br/>all-MiniLM-L6-v2"]
-    GRAPH -->|rewrite / grade / generate| GROQ["Groq LLM API<br/>llama-3.3-70b-versatile"]
+    GRAPH -->|rewrite / grade / generate| GROQ["Groq LLM API<br/>openai/gpt-oss-120b"]
     FCM --> ARTIFACTS[("embeddings/<br/>chroma_db, fcm_*, pca_*")]
 ```
 
@@ -208,7 +208,7 @@ behaviour predictable — the model and collection load exactly once per process
 
 ### 6.5 Groq free-tier LLM
 
-`llama-3.3-70b-versatile` on Groq is fast and free, which matters because the
+`openai/gpt-oss-120b` on Groq is fast and free, which matters because the
 pipeline can call the LLM several times per request (rewrite + per-doc grading +
 generation). Every LLM interaction is funnelled through `rag/prompts.py` and
 `rag/config.py`, so switching providers/models is a config change

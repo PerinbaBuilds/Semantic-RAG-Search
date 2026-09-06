@@ -23,7 +23,7 @@ The system allows users to ask questions through a web UI or REST API and receiv
 | ChromaDB | Vector database used to store and query document embeddings |
 | RAGAS | Reference-free evaluation framework for RAG pipelines |
 | FCM | Fuzzy C-Means — clustering algorithm used for the semantic cache |
-| LLM | Large Language Model (Groq-hosted `llama-3.3-70b-versatile`) |
+| LLM | Large Language Model (Groq-hosted `openai/gpt-oss-120b`) |
 | HF Spaces | Hugging Face Spaces — cloud platform used for deployment |
 
 ---

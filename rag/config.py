@@ -16,6 +16,8 @@ RETRIEVAL_K          = 8
 GRADED_K             = 5
 RELEVANCE_THRESHOLD  = 0.3
 GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
-LLM_MODEL     = os.getenv("RAG_LLM_MODEL", "llama-3.3-70b-versatile")
+# llama-3.3-70b-versatile was decommissioned by Groq (2026-08-16); openai/gpt-oss-120b
+# is Groq's recommended replacement. Override with RAG_LLM_MODEL if needed.
+LLM_MODEL     = os.getenv("RAG_LLM_MODEL", "openai/gpt-oss-120b")
 LLM_MAX_TOKENS = int(os.getenv("RAG_MAX_TOKENS", "4096"))
 MAX_REWRITE_ATTEMPTS = 2

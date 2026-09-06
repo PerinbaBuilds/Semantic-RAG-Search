@@ -53,7 +53,7 @@ For the full component breakdown, data flow, and design tradeoffs, see [`docs/AR
 | Pipeline | LangGraph | Models the rewrite→retrieve→grade→generate retry loop as an inspectable state machine |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | Small, fast, runs on CPU — good enough semantic quality for short posts |
 | Vector DB | ChromaDB (18,159 docs) | Persistent local vector store, zero external service to run |
-| LLM | Groq — `llama-3.3-70b-versatile` | Fast enough to call several times per request, and free-tier friendly |
+| LLM | Groq — `openai/gpt-oss-120b` | Fast enough to call several times per request, and free-tier friendly |
 | Semantic cache | Custom Fuzzy C-Means clustering | Cluster routing turns cache lookups from O(N) into ~O(N/K) |
 | Evaluation | RAGAS | Measures quality with no ground-truth labels — the dataset has none |
 | Hosting | Hugging Face Spaces (Docker) | Free Docker runtime for the live demo |
