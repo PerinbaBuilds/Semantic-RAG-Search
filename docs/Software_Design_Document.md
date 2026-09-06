@@ -35,7 +35,7 @@ Semantic Cache      LangGraph RAG Graph
    |              +------+---------------+
    |              v                      v
    |         ChromaDB              Groq LLM
-   |       (Vector Store)     (llama-3.3-70b)
+   |       (Vector Store)     (gpt-oss-120b)
    |
    v
 Cached Response
@@ -184,7 +184,7 @@ The pipeline is a directed state machine with the following nodes:
 | Language | Python | 3.12 |
 | API Framework | FastAPI + uvicorn | latest |
 | RAG Orchestration | LangGraph | latest |
-| LLM | Groq (`llama-3.3-70b-versatile`) | — |
+| LLM | Groq (`openai/gpt-oss-120b`) | — |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` | — |
 | Vector Store | ChromaDB | >= 1.0.0 |
 | Evaluation | RAGAS | >= 0.4.0 |
